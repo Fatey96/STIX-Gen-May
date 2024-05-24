@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberGraph Explorer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="background"></div>
+    <div class="container">
+        <h1>Sythetic Threat Intelligence Data Generator</h1>
+        <p>Explore the complex world of cyber security through our interactive knowledge graph. Dive into relationships, threats, and insights with ease.</p>
+        <a href="/select-objects" class="start-button">Start Generating</a>
+        <div class="knowledge-graph">
+            <img src="{{ url_for('static', filename='images/knowledge-graph.png') }}" alt="Knowledge Graph">
+        </div>
+    </div>
+</body>
+</html>
