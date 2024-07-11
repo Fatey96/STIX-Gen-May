@@ -1,32 +1,33 @@
 import os
-os.environ["OPENAI_API_KEY"] = "sk-proj-6K2dANij8t7gG7FohQxBT3BlbkFJtkFeltl7Ua7K6JuRF6th"
-
-"""# Imports"""
-
-from langchain.prompts import FewShotPromptTemplate, PromptTemplate
-from langchain.llms import OpenAI
-from langchain.chat_models import ChatOpenAI
-from langchain.pydantic_v1 import BaseModel
-from datetime import datetime
 from typing import List, Optional
-from langchain_experimental.tabular_synthetic_data.base import SyntheticDataGenerator
-from langchain_experimental.tabular_synthetic_data.openai import create_openai_data_generator, OPENAI_TEMPLATE
-from langchain_experimental.tabular_synthetic_data.prompts import SYNTHETIC_FEW_SHOT_SUFFIX, SYNTHETIC_FEW_SHOT_PREFIX
+import dotenv
+from langchain_core.prompts import FewShotPromptTemplate, PromptTemplate
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_experimental.tabular_synthetic_data.openai import (
+    OPENAI_TEMPLATE,
+    create_openai_data_generator,
+)
+from langchain_experimental.tabular_synthetic_data.prompts import (
+    SYNTHETIC_FEW_SHOT_PREFIX,
+    SYNTHETIC_FEW_SHOT_SUFFIX,
+)
+from langchain_community.chat_models import ChatOpenAI
 
-"""# Schema for generating AttackPattern"""
+dotenv.load_dotenv()
 
+# Define the AttackPattern schema
 class AttackPattern(BaseModel):
-    type: str
-    spec_version: str
-    id: str
-    created: str
-    modified: str
-    name: str
-    external_references: Optional[List[str]] = None
-    description: Optional[str] = None
-    aliases: Optional[List[str]] = None
-    kill_chain_phases: Optional[List[str]] = None
-    created_by_ref: Optional[str] = None
+    type: str = Field(default="attack-pattern")
+    spec_version: str = Field(default="2.1")
+    id: str = Field(description="Unique identifier for the attack pattern")
+    created: str = Field(description="Creation date of the attack pattern entry")
+    modified: str = Field(description="Last modification date of the attack pattern entry")
+    name: str = Field(description="Name of the attack pattern")
+    description: Optional[str] = Field(default=None, description="Description of the attack pattern")
+    external_references: Optional[List[dict]] = Field(default=None, description="External references for the attack pattern")
+    aliases: Optional[List[str]] = Field(default=None, description="Alternative names for the attack pattern")
+    kill_chain_phases: Optional[List[dict]] = Field(default=None, description="Kill chain phases associated with the attack pattern")
+
 
 """# Sample Data as example"""
 
@@ -43,8 +44,6 @@ examples = [
 
     ]
 
-"""# Prompt Template for GPT-4"""
-
 OPENAI_TEMPLATE = PromptTemplate(input_variables=["example"], template="{example}")
 
 prompt_template = FewShotPromptTemplate(
@@ -55,53 +54,26 @@ prompt_template = FewShotPromptTemplate(
     example_prompt=OPENAI_TEMPLATE,
 )
 
-"""# Data Generator"""
-
+# Create a LangChain data generator
 synthetic_data_generator = create_openai_data_generator(
     output_schema=AttackPattern,
-    llm=ChatOpenAI(temperature=1,model='gpt-4-turbo-preview'),
+    llm=ChatOpenAI(temperature=1, model='gpt-4-turbo-preview'),
     prompt=prompt_template,
 )
 
-"""# Parameters"""
-
-synthetic_results = synthetic_data_generator.generate(
-    subject="attack_pattern",
-    extra="Choose a unique and unconventional name for each attack pattern. Avoid common or typical names.",
-    runs=1,
-)
-
-len(synthetic_results)
-
-"""# Display Data"""
-
-synthetic_results
-
-"""# Display as a DataFrame"""
-
-import pandas as pd
-
-# Create a list of dictionaries from the objects
-synthetic_data = []
-for item in synthetic_results:
-    synthetic_data.append({
-        'type': item.type,
-        'name': item.name,
-        'description': item.description,
-        'aliases': item.aliases,
-        'external_references': item.external_references,
-        'kill_chain_phases': item.kill_chain_phases,
-        'created_by_ref': item.created_by_ref
-    })
-
-# Create a Pandas DataFrame from the list of dictionaries
-synthetic_df = pd.DataFrame(synthetic_data)
-
-# Display the DataFrame
-print(type(synthetic_df))
-synthetic_df
-
-# Save the DataFrame to a CSV file
-synthetic_df.to_csv('attack_pattern_data.csv', index=False)  # index=False prevents adding an extra index column
-print("Attack Pattern data saved to 'attack_pattern_data.csv'")
-
+def generate_attack_pattern(count: int) -> List[AttackPattern]:
+    """
+    Generate synthetic attack pattern entries.
+    
+    Args:
+        count (int): Number of attack pattern entries to generate.
+    
+    Returns:
+        List[AttackPattern]: List of generated attack pattern entries.
+    """
+    synthetic_results = synthetic_data_generator.generate(
+        subject="attack_pattern",
+        extra="Create unique and realistic attack pattern names and characteristics. Ensure diversity in techniques, targets, and associated kill chain phases.",
+        runs=count,
+    )
+    return synthetic_results

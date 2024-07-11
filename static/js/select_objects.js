@@ -2,6 +2,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const stixObjects = document.querySelectorAll('.stix-object');
     const selectedList = document.getElementById('selected-list');
     const generateGraphButton = document.getElementById('generate-graph');
+    const copyJsonButton = document.getElementById('copy-json');
+    const flipButton = document.getElementById('flip-button');
+    const flipContainer = document.querySelector('.flip-container');
 
     stixObjects.forEach(button => {
         button.addEventListener('click', function() {
@@ -30,18 +33,17 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            // Check if 'stix_bundle' is a string, and if so, parse it
             let bundleData = data.stix_bundle;
             if (typeof bundleData === 'string') {
                 bundleData = JSON.parse(bundleData);
             }
-            // Re-serialize with indentation for formatting
             document.getElementById('json-output').textContent = JSON.stringify(bundleData, null, 2);
+            document.getElementById('story-output').innerHTML = `<h4>Story:</h4><p>${data.story}</p>`;
         })
         .catch(error => console.error('Error:', error));
     });
 
-    document.getElementById('copy-json').addEventListener('click', function() {
+    copyJsonButton.addEventListener('click', function() {
         const jsonOutput = document.getElementById('json-output').textContent;
         navigator.clipboard.writeText(jsonOutput).then(() => {
             alert('JSON copied to clipboard');
@@ -50,7 +52,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-
+    flipButton.addEventListener('click', function() {
+        flipContainer.classList.toggle('flipped');
+        this.textContent = flipContainer.classList.contains('flipped') ? 'Show Bundle' : 'Show Story';
+    });
 
     function addEntityInput(objectName) {
         const entityDiv = document.createElement('div');
@@ -66,6 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
         input.id = `${objectName}-count`;
         input.name = `${objectName}-count`;
         input.min = '1';
+        input.value = '1';
 
         entityDiv.appendChild(label);
         entityDiv.appendChild(input);

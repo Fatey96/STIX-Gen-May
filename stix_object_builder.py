@@ -1,16 +1,386 @@
 from faker import Faker
-from stix2 import ThreatActor, Identity, Malware, Tool, Indicator, AttackPattern, Campaign, IntrusionSet, Vulnerability, Location, CourseOfAction, MalwareAnalysis
-from StixObjectLang.ThreatActor import generate_threat_actors, ThreatActor
+from stix2 import ThreatActor, Identity, Malware, Tool,Infrastructure, Indicator, AttackPattern, Campaign, IntrusionSet, Vulnerability, Location, CourseOfAction, MalwareAnalysis, Note, Opinion, ObservedData, Report, Grouping
+
+from StixObjectLang.PhaseOne.Campaign import generate_campaigns
+from StixObjectLang.PhaseOne.Identity import generate_identities
+from StixObjectLang.PhaseOne.Indicator import generate_indicator
+from StixObjectLang.PhaseOne.Infrastructure import generate_infrastructures
+from StixObjectLang.PhaseOne.IntrusionSet import generate_intrusion_set
+from StixObjectLang.PhaseOne.Location import generate_locations
+from StixObjectLang.PhaseOne.Malware import generate_malware
+from StixObjectLang.PhaseOne.ThreatActor import generate_threat_actor
+from StixObjectLang.PhaseOne.Tool import generate_tool
+
+from StixObjectLang.PhaseTwo.AttackPattern import generate_attack_pattern
+from StixObjectLang.PhaseTwo.CourseOfAction import generate_course_of_action
+from StixObjectLang.PhaseTwo.Grouping import generate_grouping
+from StixObjectLang.PhaseTwo.MalwareAnalysis import generate_malware_analysis
+from StixObjectLang.PhaseTwo.Note import generate_notes
+from StixObjectLang.PhaseTwo.Opinion import generate_opinions
+from StixObjectLang.PhaseTwo.ObservedData import generate_observed_data
+from StixObjectLang.PhaseTwo.Report import generate_reports
+from StixObjectLang.PhaseTwo.Vulnerability import generate_vulnerabilities
+
+from stix2 import KillChainPhase
 from datetime import datetime, timedelta
 from dateutil.parser import parse
+from typing import List, Optional
 import random
 import uuid
 
-fake = Faker()
+def convert_to_iso_format(date_str: Optional[str]) -> Optional[str]:
+    """
+    Convert a date string to ISO format with UTC timezone.
+    If the input is None or not a valid date string, return None.
+    """
+    if date_str is None:
+        return None
+    try:
+        date_obj = datetime.fromisoformat(date_str.rstrip('Z'))
+        return date_obj.isoformat() + "Z"
+    except ValueError:
+        return datetime.utcnow().isoformat() + "Z"
 
+def format_kill_chain_phases(phases):
+    if not phases:
+        return None
+    return [KillChainPhase(kill_chain_name=phase.get('kill_chain_name'), phase_name=phase.get('phase_name')) 
+            for phase in phases if 'kill_chain_name' in phase and 'phase_name' in phase]
+
+def format_stix_pattern(pattern: str) -> str:
+    pattern = pattern.strip()
+    if not pattern.startswith('[') and not pattern.endswith(']'):
+        pattern = f"[{pattern}]"
+    pattern = pattern.replace('email:message-subject', 'email-message:subject')
+    return pattern
+
+def get_random_refs(phase_1_objects, count=2):
+    return random.sample([obj.id for obj in phase_1_objects], min(count, len(phase_1_objects)))
+
+def create_attack_patterns(count, phase_1_objects):
+    synthetic_results = generate_attack_pattern(count)
+    fake_attack_patterns = []
+    for item in synthetic_results:
+        fake_attack_pattern = AttackPattern(
+            type=item.type,
+            spec_version="2.1",
+            id=f"attack-pattern--{str(uuid.uuid4())}",
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            name=item.name,
+            description=item.description,
+            external_references=get_random_refs(phase_1_objects),
+            aliases=item.aliases,
+            kill_chain_phases=format_kill_chain_phases(item.kill_chain_phases) if item.kill_chain_phases else None,
+        )
+        fake_attack_patterns.append(fake_attack_pattern)
+    return fake_attack_patterns
+
+def create_campaigns(count):
+    synthetic_results = generate_campaigns(count)
+    fake_campaigns = []
+    for item in synthetic_results:
+        try:
+            # Remove the 'Z' and '+00:00' from the timestamp string
+            first_seen = item.first_seen.rstrip('Z').split('+')[0] if item.first_seen else None
+            last_seen = item.last_seen.rstrip('Z').split('+')[0] if item.last_seen else None
+            
+            fake_campaign = Campaign(
+                type=item.type,
+                spec_version=item.spec_version,
+                id=f"campaign--{str(uuid.uuid4())}",
+                created=datetime.utcnow(),
+                modified=datetime.utcnow(),
+                name=item.name,
+                description=item.description,
+                aliases=item.aliases,
+                first_seen=datetime.fromisoformat(first_seen) if first_seen else None,
+                last_seen=datetime.fromisoformat(last_seen) if last_seen else None,
+                objective=item.objective
+            )
+            fake_campaigns.append(fake_campaign)
+        except Exception as e:
+            print(f"Error creating campaign: {str(e)}")
+            print(f"Problematic item: {item}")
+    return fake_campaigns
+
+def create_notes(count, phase_1_objects):
+    synthetic_results = generate_notes(count)
+    fake_notes = []
+    for item in synthetic_results:
+        fake_note = Note(
+            type=item.type,
+            spec_version="2.1",
+            id="note--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            abstract=item.abstract,
+            content=item.content,
+            authors=item.authors,
+            object_refs=get_random_refs(phase_1_objects)
+        )
+        fake_notes.append(fake_note)
+    return fake_notes
+
+def create_observed_datas(count, phase_1_objects):
+    synthetic_results = generate_observed_data(count)
+    fake_observed_data = []
+    for item in synthetic_results:
+        fake_observed_datum = ObservedData(
+            type=item.type,
+            spec_version="2.1",
+            id="observed-data--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            first_observed=datetime.fromisoformat(item.first_observed.rstrip('Z')),
+            last_observed=datetime.fromisoformat(item.last_observed.rstrip('Z')),
+            number_observed=item.number_observed,
+            objects=get_random_refs(phase_1_objects)
+        )
+        fake_observed_data.append(fake_observed_datum)
+    return fake_observed_data
+
+def create_reports(count, phase_1_objects):
+    synthetic_results = generate_reports(count)
+    fake_reports = []
+    for item in synthetic_results:
+        fake_report = Report(
+            type=item.type,
+            spec_version="2.1",
+            id="report--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            name=item.name,
+            description=item.description,
+            published=datetime.fromisoformat(item.published.rstrip('Z')),
+            object_refs=get_random_refs(phase_1_objects)
+        )
+        fake_reports.append(fake_report)
+    return fake_reports
+
+def create_course_of_actions(count, phase_1_objects):
+    synthetic_results = generate_course_of_action(count)
+    fake_courses_of_action = []
+    for item in synthetic_results:
+        fake_course_of_action = CourseOfAction(
+            type=item.type,
+            spec_version="2.1",
+            id="course-of-action--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            name=item.name,
+            description=item.description
+            
+        )
+        fake_courses_of_action.append(fake_course_of_action)
+
+    return fake_courses_of_action
+
+def create_identities(count):
+    synthetic_results = generate_identities(count)
+    fake_identities = []
+    for item in synthetic_results:
+        try:
+            fake_identity = Identity(
+                type=item.type,
+                spec_version=item.spec_version,
+                id="identity--" + str(uuid.uuid4()),
+                created=datetime.utcnow().isoformat() + "Z",
+                modified=datetime.utcnow().isoformat() + "Z",
+                name=item.name,
+                description=item.description,
+                roles=item.roles,
+                identity_class=item.identity_class,
+                sectors=item.sectors,
+                contact_information=item.contact_information
+            )
+            fake_identities.append(fake_identity)
+        except Exception as e:
+            print(f"Error creating identity: {str(e)}")
+            print(f"Problematic item: {item}")
+    return fake_identities
+
+def create_groupings(count, phase_1_objects):
+    synthetic_results = generate_grouping(count)
+    fake_groupings = []
+    for item in synthetic_results:
+        fake_grouping = Grouping(
+            type=item.type,
+            spec_version="2.1",
+            id="grouping--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            name=item.name,
+            description=item.description,
+            context=item.context,
+            object_refs=get_random_refs(phase_1_objects)
+        )
+        fake_groupings.append(fake_grouping)
+    return fake_groupings
+
+def create_opinions(count, phase_1_objects):
+    synthetic_results = generate_opinions(count)
+    fake_opinions = []
+    for item in synthetic_results:
+        fake_opinion = Opinion(
+            type=item.type,
+            spec_version="2.1",
+            id="opinion--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            opinion=item.opinion,
+            explanation=item.explanation,
+            authors=item.authors,
+            object_refs=get_random_refs(phase_1_objects)
+        )
+        fake_opinions.append(fake_opinion)
+
+def create_indicators(count):
+    synthetic_results = generate_indicator(count)
+    fake_indicators = []
+    for item in synthetic_results:
+        try:
+            fake_indicator = Indicator(
+                type=item.type,
+                spec_version=item.spec_version,
+                id=f"indicator--{str(uuid.uuid4())}",
+                created=datetime.utcnow(),
+                modified=datetime.utcnow(),
+                name=item.name,
+                description=item.description,
+                pattern=item.pattern,
+                pattern_type=item.pattern_type,
+                valid_from=datetime.fromisoformat(item.valid_from.rstrip('Z')),
+                valid_until=datetime.fromisoformat(item.valid_until.rstrip('Z')) if item.valid_until else None,
+                indicator_types=item.indicator_types
+            )
+            fake_indicators.append(fake_indicator)
+        except Exception as e:
+            print(f"Error creating indicator: {str(e)}")
+            print(f"Problematic item: {item}")
+    return fake_indicators
+
+def create_infrastructures(count):
+    synthetic_results = generate_infrastructures(count)
+    stix_infrastructures = []
+    for item in synthetic_results:
+        stix_infrastructure = Infrastructure(
+            type=item.type,
+            spec_version="2.1",
+            id=f"infrastructure--{str(uuid.uuid4())}",
+            created=datetime.utcnow(),
+            modified=datetime.utcnow(),
+            name=item.name,
+            description=item.description,
+            infrastructure_types=item.infrastructure_types,
+            aliases=item.aliases,
+            kill_chain_phases=format_kill_chain_phases(item.kill_chain_phases),
+            first_seen=convert_to_iso_format(item.first_seen) if item.first_seen else None,
+            last_seen=convert_to_iso_format(item.last_seen) if item.last_seen else None
+        )
+        stix_infrastructures.append(stix_infrastructure)
+    return stix_infrastructures
+
+def create_intrusion_sets(count):
+    synthetic_results = generate_intrusion_set(count)
+    fake_intrusion_sets = []
+    for item in synthetic_results:
+        try:
+            fake_intrusion_set = IntrusionSet(
+                type=item.type,
+                spec_version="2.1",
+                id=f"intrusion-set--{str(uuid.uuid4())}",
+                created=datetime.utcnow(),
+                modified=datetime.utcnow(),
+                name=item.name,
+                description=item.description,
+                aliases=item.aliases,
+                first_seen=convert_to_iso_format(item.first_seen),
+                last_seen=convert_to_iso_format(item.last_seen),
+                goals=item.goals,
+                resource_level=item.resource_level,
+                primary_motivation=item.primary_motivation,
+                secondary_motivations=item.secondary_motivations
+            )
+            fake_intrusion_sets.append(fake_intrusion_set)
+        except Exception as e:
+            print(f"Error creating intrusion set: {str(e)}")
+            print(f"Problematic item: {item}")
+    return fake_intrusion_sets
+
+def create_locations(count):
+    synthetic_results = generate_locations(count)
+    fake_locations = []
+    for item in synthetic_results:
+        fake_location = Location(
+            type=item.type,
+            spec_version="2.1",
+            id="location--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            name=item.name,
+            description=item.description,
+            latitude=item.latitude,
+            longitude=item.longitude,
+            precision=item.precision,
+            region=item.region,
+            country=item.country,
+            administrative_area=item.administrative_area,
+            city=item.city,
+            street_address=item.street_address,
+            postal_code=item.postal_code
+        )
+        fake_locations.append(fake_location)
+
+    return fake_locations
+
+def create_malwares(count):
+    synthetic_results = generate_malware(count)
+    fake_malwares = []
+    for item in synthetic_results:
+        fake_malware = Malware(
+            type=item.type,
+            spec_version="2.1",
+            id="malware--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            name=item.name,
+            description=item.description,
+            malware_types=item.malware_types,
+            is_family=bool(item.is_family),
+            aliases=item.aliases,
+            first_seen=convert_to_iso_format(item.first_seen),
+            last_seen=convert_to_iso_format(item.last_seen),
+        )
+        fake_malwares.append(fake_malware)
+    return fake_malwares
+
+def create_malware_analysis(count, phase_1_objects):
+    synthetic_results = generate_malware_analysis(count)
+    fake_malware_analyses = []
+    for item in synthetic_results:
+        fake_malware_analysis = MalwareAnalysis(
+            type=item.type,
+            spec_version="2.1",
+            id="malware-analysis--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            product=item.product,
+            version=item.version,
+            configuration_version=item.configuration_version,
+            modules=item.modules,
+            analysis_engine_version=item.analysis_engine_version,
+            analysis_definition_version=item.analysis_definition_version,
+            submitted=item.submitted,
+            analysis_started=item.analysis_started,
+            analysis_ended=item.analysis_ended,
+            analysis_sco_refs=get_random_refs(phase_1_objects)
+        )
+        fake_malware_analyses.append(fake_malware_analysis)
+    return fake_malware_analyses
 
 def create_threat_actors(count):
-    synthetic_results = generate_threat_actors(count)
+    synthetic_results = generate_threat_actor(count)
 
     # Convert the synthetic results to the format expected by STIX
     fake_threat_actors = []
@@ -25,8 +395,8 @@ def create_threat_actors(count):
             description=item.description,
             threat_actor_types=item.threat_actor_types,
             aliases=item.aliases,
-            first_seen=parse(item.first_seen).isoformat() + "Z",
-            last_seen=parse(item.last_seen).isoformat() + "Z",
+            first_seen=convert_to_iso_format(item.first_seen),
+            last_seen=convert_to_iso_format(item.last_seen),
             roles=item.roles,
             goals=item.goals,
             sophistication=item.sophistication,
@@ -39,460 +409,53 @@ def create_threat_actors(count):
 
     return fake_threat_actors
 
-
-def create_identities(count):
-
-    identity_classes = ["individual", "group", "organization", "class", "unknown"]
-    sectors = ["financial", "healthcare", "government", "information technology", "education"]
-    roles = ["administrator", "user", "developer", "analyst", "researcher"]
-
-    fake_identities = []
-    for _ in range(count):
-        now = datetime.now()
-        name = fake.name()
-        description = "Generated fake Identity."
-        identity_class = random.choice(identity_classes)
-        sector = random.choice(sectors)
-        role = random.choice(roles)
-        contact_info = f"contact@{fake.word().lower()}.com"
-
-        fake_identity =Identity(
-            name= name,
-            description= description,
-            roles= [role],
-            identity_class= identity_class,
-            sectors= [sector],
-            contact_information= contact_info
-        )
-
-        fake_identities.append(fake_identity)
-
-    return fake_identities
-
-def create_malware(count):
-    templates = [
-        "{} Virus",
-        "{} Worm",
-        "{} Trojan",
-        "{} Ransomware",
-        "{} Botnet",
-        "{} Spyware",
-        "{} Rootkit",
-        "{} FilelessMalware",
-        "{} Adware",
-        "{} Keylogger",
-        "{} Cryptojacker",
-        "{} Wiper"
-    ]
-    malware_types = [
-        "backdoor", "bot", "ddos", "dropper", "exploit-kit",
-        "keylogger", "ransomware", "remote-access-trojan", "resource-exploitation",
-        "rogue-security-software", "rootkit", "screen-capture", "spyware",
-        "trojan", "virus", "worm"
-    ]
-    kill_chain_phases = [
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "reconnaissance"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "weaponization"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "delivery"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "exploitation"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "installation"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "command-and-control"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "actions-on-objectives"}
-    ]
-    capabilities = [
-        "avoids-analysis", "avoids-detection", "captures-input", "cleans-traces",
-        "commits-fraud", "communicates-with-c2", "compromises-data-integrity",
-        "compromises-system", "controls-remote-systems", "escalates-privileges",
-        "evades-av", "exfiltrates-data", "harvests-credentials", "hides-artifacts",
-        "hides-executing-code", "infects-files", "persists-after-system-reboot",
-        "prevents-artifact-access", "prevents-artifact-deletion",
-        "probes-network-environment", "self-modifies", "steals-authentication-tokens",
-        "violates-system-operational-integrity"
-    ]
-
-    fake_malwares = []
-    for _ in range(count):
-        name = random.choice(templates).format(fake.word().capitalize())
-        description = "Generated fake Malware."
-        malware_type = random.choice(malware_types)
-        is_family = random.choice([True, False])
-        aliases = [fake.word().capitalize() for _ in range(random.randint(1, 3))]
-        first_seen = fake.date_between(start_date="-10y", end_date="today")
-        last_seen = fake.date_between(start_date=first_seen, end_date="today")
-        operating_system_refs = ["software--" + fake.uuid4() for _ in range(random.randint(1, 3))]
-        architecture_execution_envs = ["x86", "x64"]
-        implementation_languages = ["C", "C++", "Assembly"]
-        capability = random.choice(capabilities)
-        kill_chain_phase = random.choice(kill_chain_phases)
-
-        fake_malware = Malware(
-            name=name,
-            description=description,
-            malware_types=[malware_type],
-            is_family=is_family,
-            aliases=aliases,
-            kill_chain_phases=[kill_chain_phase],
-            first_seen=first_seen,
-            last_seen=last_seen,
-            operating_system_refs=operating_system_refs,
-            architecture_execution_envs=architecture_execution_envs,
-            implementation_languages=implementation_languages,
-            capabilities=[capability]
-        )
-
-        fake_malwares.append(fake_malware)
-
-    return fake_malwares
-
-
-def create_indicators(count):
-    templates = [
-        "{} PhishingActivity",
-        "{} MalwareSignature",
-        "{} AnomalousTraffic",
-        "{} SuspiciousLogin",
-        "{} DataExfiltrationSignal"
-    ]
-    indicator_types = [
-        "anomalous-activity", "malicious-activity", "attribution",
-        "compromised", "benign"
-    ]
-
-    fake_indicators = []
-    for _ in range(count):
-        name = random.choice(templates).format(fake.word().capitalize())
-        pattern = "[file:hashes.'SHA-256' = '{}']".format(fake.sha256())
-        pattern_type = "stix"
-        description = "Generated fake Indicator"
-        indicator_type = random.choice(indicator_types)
-
-        fake_indicator = Indicator(
-            name=name,
-            description=description,
-            pattern=pattern,
-            pattern_type=pattern_type,
-            indicator_types=[indicator_type]
-        )
-
-        fake_indicators.append(fake_indicator)
-
-    return fake_indicators
-
-
-def create_attack_patterns(count):
-    templates = [
-        "{} Phishing",
-        "{} SpearPhishing",
-        "{} DriveByCompromise",
-        "{} ExploitPublicFacingApplication"
-    ]
-    kill_chain_phases = [
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "reconnaissance"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "weaponization"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "delivery"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "exploitation"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "installation"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "command-and-control"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "actions-on-objectives"}
-    ]
-
-    fake_attack_patterns = []
-    for _ in range(count):
-        now = datetime.now()
-        name = random.choice(templates).format(fake.word().capitalize())
-        description = "Generated fake Attack Pattern."
-        external_references = [{
-            "source_name": "capec",
-            "external_id": f"CAPEC-{random.randint(1, 500)}",
-            "url": f"https://capec.mitre.org/data/definitions/{random.randint(1, 500)}.html",
-            "description": "Reference to a common attack pattern enumeration and classification."
-        }]
-        aliases = [f"{name} Variant {i}" for i in range(1, random.randint(2, 4))]
-        kill_chain_phase = random.choice(kill_chain_phases)
-
-        fake_attack_pattern =AttackPattern(
+def create_tools(count):
+    synthetic_results = generate_tool(count)
+    fake_tools = []
+    for item in synthetic_results:
+        fake_tool = Tool(
+            type=item.type,
             spec_version="2.1",
-            id= f"attack-pattern--{uuid.uuid4()}",
-            created= now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            modified=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            name= name,
-            description=description,
-            aliases= aliases,
-            kill_chain_phases= [kill_chain_phase],
-            external_references= external_references
-    )
-
-        fake_attack_patterns.append(fake_attack_pattern)
-
-    return fake_attack_patterns
-
-
-def create_campaigns(count):
-    templates = [
-        "Operation {}",
-        "{} Threat",
-        "Project {}",
-        "{} Offensive",
-        "{} Maneuver",
-        "{} Wave",
-        "{} Blitz"
-    ]
-    objectives = [
-        "Intelligence gathering",
-        "Disruption of services",
-        "Theft of intellectual property",
-        "Reputation damage",
-        "Strategic positioning"
-    ]
-
-    fake_campaigns = []
-    for _ in range(count):
-        now = datetime.now()
-        name = random.choice(templates).format(fake.word().capitalize())
-        description = "Generated fake Campaign"
-        aliases = [f"{name} Variant {i}" for i in range(1, random.randint(2, 4))]
-        first_seen = (now - timedelta(days=random.randint(10, 1000))).strftime("%Y-%m-%dT%H:%M:%SZ")
-        last_seen = (now - timedelta(days=random.randint(1, 9))).strftime("%Y-%m-%dT%H:%M:%SZ")
-        objective = random.choice(objectives)
-
-        fake_campaign =Campaign(
-            name= name,
-            description=description,
-            aliases=aliases,
-            first_seen= first_seen,
-            last_seen=last_seen,
-            objective= objective
+            id="tool--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            name=item.name,
+            description=item.description,
+            tool_version=item.tool_version,
+            tool_types=item.tool_types,
+            kill_chain_phases=format_kill_chain_phases(item.kill_chain_phases),
+            aliases=item.aliases
         )
+        fake_tools.append(fake_tool)
+    return fake_tools
 
-        fake_campaigns.append(fake_campaign)
-
-    return fake_campaigns
-
-
-def create_intrusion_sets(count):
-    templates = [
-        "{} Recon",
-        "{} Domination",
-        "{} Exploitation",
-        "{} Disruption",
-        "{} Theft"
-    ]
-    resource_levels = ["individual", "club", "team", "organization", "government"]
-    motivations = ["ideological", "economic", "espionage", "financial", "revenge", "notoriety"]
-
-    fake_intrusion_sets = []
-    for _ in range(count):
-        now = datetime.now()
-        name = random.choice(templates).format(fake.word().capitalize())
-        description = "Generated fake Intrusion Set"
-        aliases = [f"{name} Variant {i}" for i in range(1, random.randint(2, 4))]
-        first_seen = (now - timedelta(days=random.randint(10, 1000))).strftime("%Y-%m-%dT%H:%M:%SZ")
-        last_seen = (now - timedelta(days=random.randint(1, 9))).strftime("%Y-%m-%dT%H:%M:%SZ")
-        goals = [f"Goal {i}: " + fake.sentence() for i in range(1, random.randint(2, 4))]
-        resource_level = random.choice(resource_levels)
-        primary_motivation = random.choice(motivations)
-        secondary_motivations = random.sample([m for m in motivations if m != primary_motivation],
-                                              k=random.randint(1, len(motivations) - 1))
-
-        fake_intrusion_set = IntrusionSet(
-            name= name,
-            description= description,
-            aliases= aliases,
-            first_seen= first_seen,
-            last_seen=last_seen,
-            goals=goals,
-            resource_level= resource_level,
-            primary_motivation= primary_motivation,
-            secondary_motivations=secondary_motivations
-        )
-
-        fake_intrusion_sets.append(fake_intrusion_set)
-
-    return fake_intrusion_sets
-
-
-def create_vulnerabilities(count):
-    templates = [
-        "{} Misconfiguration",
-        "{} UnsecuredAPI",
-        "{} OutdatedSoftware",
-        "{} ZeroDay",
-        "{} CredentialLeak",
-        "{} AccessControlIssue",
-        "{} SharedResponsibilityFlaw"
-    ]
-    cve_years = list(range(1999, datetime.now().year + 1))
-
+def create_vulnerabilities(count, phase_1_objects):
+    synthetic_results = generate_vulnerabilities(count)
     fake_vulnerabilities = []
-    for _ in range(count):
-        now = datetime.now()
-        name = random.choice(templates).format(fake.word().capitalize())
-        description = "Generated fake Vulnerability."
-        cve_id = f"CVE-{random.choice(cve_years)}-{random.randint(1000, 9999)}"
-
-        external_references = [{
-            "source_name": "cve",
-            "external_id": cve_id,
-            "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}",
-            "description": "National Vulnerability Database entry."
-        }]
-
+    for item in synthetic_results:
+        # Extract potential sources from phase 1 objects
+        potential_sources = [obj for obj in phase_1_objects if obj.type in ['identity', 'tool', 'malware']]
+        source = random.choice(potential_sources) if potential_sources else None
+        
         fake_vulnerability = Vulnerability(
-            name= name,
-            description= description,
-            external_references= external_references
+            type=item.type,
+            spec_version="2.1",
+            id="vulnerability--" + str(uuid.uuid4()),
+            created=datetime.utcnow().isoformat() + "Z",
+            modified=datetime.utcnow().isoformat() + "Z",
+            name=item.name,
+            description=item.description,
+            vulnerability_types=item.vulnerability_types,
+            first_seen=parse(item.first_seen).isoformat() + "Z",
+            last_seen=parse(item.last_seen).isoformat() + "Z",
+            severity=item.severity,
+            impact=item.impact,
+            likelihood=item.likelihood
         )
-
+        
+        if source:
+            fake_vulnerability.source_name = source.name
+        
         fake_vulnerabilities.append(fake_vulnerability)
 
     return fake_vulnerabilities
-
-
-def create_tools(count):
-    templates = [
-        "{} Scanner",
-        "{} Firewall",
-        "{} Encryptor",
-        "{} Analyzer",
-        "{} Protector"
-    ]
-    tool_types = ["network-capture", "password-cracking", "intrusion-detection", "forensic", "encryption"]
-    kill_chain_phases = [
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "reconnaissance"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "weaponization"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "delivery"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "exploitation"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "installation"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "command-and-control"},
-        {"kill_chain_name": "lockheed-martin-cyber-kill-chain", "phase_name": "actions-on-objectives"}
-    ]
-
-    fake_tools = []
-    for _ in range(count):
-        now = datetime.now()
-        tool_name = random.choice(templates).format(fake.word().capitalize())
-        tool_description = "Generated fake Tool."
-        tool_type = random.choice(tool_types)
-        aliases = [f"{tool_name} Alias {i}" for i in range(1, random.randint(2, 3))]
-        tool_version = f"{random.randint(1, 10)}.{random.randint(0, 9)}"
-
-        fake_tool = Tool(
-            name=tool_name,
-            description= tool_description,
-            tool_types= [tool_type],
-            aliases=aliases,
-            kill_chain_phases= kill_chain_phases,
-            tool_version=tool_version
-        )
-
-        fake_tools.append(fake_tool)
-
-    return fake_tools
-
-
-def create_course_of_actions(count):
-    actions = [
-        "Apply security patch",
-        "Update firewall rules",
-        "Conduct training on phishing awareness",
-        "Implement multi-factor authentication",
-        "Encrypt sensitive data at rest and in transit"
-    ]
-    descriptions = [
-        "This Course of Action involves {} to mitigate potential vulnerabilities.",
-        "The recommended action is {} to enhance security posture.",
-        "To prevent security breaches, {} is advised as a necessary Course of Action.",
-        "For improving organizational security, it is essential to {}."
-    ]
-
-    fake_courses_of_action = []
-    for _ in range(count):
-        action = random.choice(actions)
-        description_format = random.choice(descriptions)
-        name = f"CoA for {action.split(' ')[-1]}"
-
-        fake_course_of_action = CourseOfAction(
-            name= name,
-            description= description_format.format(action)
-        )
-
-        fake_courses_of_action.append(fake_course_of_action)
-
-    return fake_courses_of_action
-
-
-def create_locations(count):
-    regions = ["Americas", "Europe", "Asia", "Africa", "Oceania"]
-    countries = [fake.country_code(representation="alpha-2") for _ in range(count)]
-
-    fake_locations = []
-    for _ in range(count):
-        country = random.choice(countries)
-        city = fake.city()
-        street_address = fake.street_address()
-        postal_code = fake.postcode()
-        administrative_area = fake.state()
-        latitude = fake.latitude()
-        longitude = fake.longitude()
-        precision = random.uniform(5, 100)
-        region = random.choice(regions)
-        name = f"{city}, {country}"
-        description = f"Location in {city}, {country} at {street_address}, {postal_code}."
-
-        fake_location = Location(
-            name= name,
-            description= description,
-            latitude=float(latitude),
-            longitude= float(longitude),
-            precision= precision,
-            region=region,
-            country = country,
-            administrative_area = administrative_area,
-            city = city,
-            street_address=street_address,
-            postal_code = postal_code
-        )
-
-        fake_locations.append(fake_location)
-
-    return fake_locations
-
-
-def create_malware_analysis(count):
-    fake_malware_analyses = []
-    products = ["malwarelyzer", "anonymized", "threatscanner", "virusdigger", "bugsearch"]
-    results = ["clean", "malicious", "suspicious", "unknown"]
-    software = ["custom-toolkit", "exploit-scanner", "network-monitor"]
-
-    for _ in range(count):
-        now = datetime.now()
-        product_name = random.choice(products)
-        version = f"{random.randint(1, 5)}.{random.randint(0, 9)}"
-        submitted_date = now - timedelta(days=random.randint(1, 30))
-        analysis_started_date = submitted_date + timedelta(minutes=random.randint(1, 60))
-        analysis_ended_date = analysis_started_date + timedelta(minutes=random.randint(1, 60))
-        result_name = f"{fake.word()} malware"
-        result = random.choice(results)
-
-        fake_malware_analysis = MalwareAnalysis(
-            product= product_name,
-            version= version,
-            host_vm_ref= f"software--{uuid.uuid4()}",
-            operating_system_ref= f"software--{uuid.uuid4()}",
-            installed_software_refs= [f"software--{uuid.uuid4()}" for _ in range(random.randint(1, 3))],
-            configuration_version="default-config",
-            modules=random.sample(software, k=random.randint(1, len(software))),
-            analysis_engine_version= version,
-            analysis_definition_version= f"{random.randint(1, 100)}",
-            submitted= submitted_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            analysis_started= analysis_started_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            analysis_ended= analysis_ended_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            result_name= result_name,
-            result=result,
-            analysis_sco_refs= [f"file--{uuid.uuid4()}" for _ in range(random.randint(1, 5))],
-            sample_ref=f"file--{uuid.uuid4()}"
-        )
-
-        fake_malware_analyses.append(fake_malware_analysis)
-
-    return fake_malware_analyses

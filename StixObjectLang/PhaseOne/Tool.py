@@ -1,35 +1,34 @@
 import os
-os.environ["OPENAI_API_KEY"] = "sk-proj-6K2dANij8t7gG7FohQxBT3BlbkFJtkFeltl7Ua7K6JuRF6th"
-
-"""# Imports"""
-
-from langchain.prompts import FewShotPromptTemplate, PromptTemplate
-from langchain.chat_models import ChatOpenAI
-from langchain.pydantic_v1 import BaseModel
-from datetime import datetime
 from typing import List, Optional
-from langchain_experimental.tabular_synthetic_data.base import SyntheticDataGenerator
-from langchain_experimental.tabular_synthetic_data.openai import create_openai_data_generator, OPENAI_TEMPLATE
-from langchain_experimental.tabular_synthetic_data.prompts import SYNTHETIC_FEW_SHOT_SUFFIX, SYNTHETIC_FEW_SHOT_PREFIX
+import dotenv
+from langchain_core.prompts import FewShotPromptTemplate, PromptTemplate
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_experimental.tabular_synthetic_data.openai import (
+    OPENAI_TEMPLATE,
+    create_openai_data_generator,
+)
+from langchain_experimental.tabular_synthetic_data.prompts import (
+    SYNTHETIC_FEW_SHOT_PREFIX,
+    SYNTHETIC_FEW_SHOT_SUFFIX,
+)
+from langchain_community.chat_models import ChatOpenAI
 
-"""# Schema for generating Tool
+dotenv.load_dotenv()
 
-"""
-
+# Define the Tool schema
 class Tool(BaseModel):
-    type: str
-    spec_version: str
-    id: str
-    created: str
-    modified: str
-    name: str
-    tool_types: Optional[List[str]]
-    description: Optional[str] = None
-    aliases: Optional[List[str]] = None
-    kill_chain_phases: Optional[List[str]] = None
-    tool_version: Optional[str] = None
+    type: str = Field(default="tool")
+    spec_version: str = Field(default="2.1")
+    id: str = Field(description="Unique identifier for the tool")
+    created: str = Field(description="Creation date of the tool entry")
+    modified: str = Field(description="Last modification date of the tool entry")
+    name: str = Field(description="Name of the tool")
+    tool_types: Optional[List[str]] = Field(default=None, description="Types of the tool")
+    description: Optional[str] = Field(default=None, description="Description of the tool")
+    aliases: Optional[List[str]] = Field(default=None, description="Alternative names for the tool")
+    kill_chain_phases: Optional[List[str]] = Field(default=None, description="Kill chain phases associated with the tool")
+    tool_version: Optional[str] = Field(default=None, description="Version of the tool")
 
-"""# Sample Data as example"""
 
 examples = [
     {"example": """Type: tool, Name: Metasploit Framework, Tool Types: exploitation, Description: A popular open-source penetration testing framework used for developing and executing exploit code against remote targets, Aliases: None, Kill Chain Phases: exploitation, Tool Version: 6.0.1"""},
@@ -43,8 +42,6 @@ examples = [
     {"example": """Type: tool, Name: TeamViewer, Tool Types: remote-access, Description: A proprietary software application for remote control, desktop sharing, online meetings, web conferencing, and file transfer between computers, Aliases: None, Kill Chain Phases: reconnaissance, Tool Version: 15.21.5"""},
 ]
 
-"""# Prompt Template for GPT-4"""
-
 OPENAI_TEMPLATE = PromptTemplate(input_variables=["example"], template="{example}")
 
 prompt_template = FewShotPromptTemplate(
@@ -55,53 +52,27 @@ prompt_template = FewShotPromptTemplate(
     example_prompt=OPENAI_TEMPLATE,
 )
 
-"""# Data Generator"""
-
+# Create a LangChain data generator
 synthetic_data_generator = create_openai_data_generator(
     output_schema=Tool,
-    llm=ChatOpenAI(temperature=1,model='gpt-4-turbo-preview'),
+    llm=ChatOpenAI(temperature=1, model='gpt-4o'),
     prompt=prompt_template,
 )
 
-"""# Parameters"""
-
-synthetic_results = synthetic_data_generator.generate(
-    subject="tool",
-    extra="Choose a unique and unconventional name for each tool. Avoid common or typical names. Tool Types can be from this list: denial-of-service, exploitation, information-gathering, network-capture, credential-exploitation, remote-access, vulnerability-scanning, unknown",
-    runs=55,
-)
-
-len(synthetic_results)
-
-"""# Display Data"""
-
-synthetic_results
-
-"""# Display as a DataFrame"""
-
-import pandas as pd
-
-# Create a list of dictionaries from the objects
-synthetic_data = []
-for item in synthetic_results:
-    synthetic_data.append({
-        'type': item.type,
-        'name': item.name,
-        'tool_types': item.tool_types,
-        'description': item.description,
-        'aliases': item.aliases,
-        'kill_chain_phases': item.kill_chain_phases,
-        'tool_version': item.tool_version
-    })
-
-# Create a Pandas DataFrame from the list of dictionaries
-synthetic_df = pd.DataFrame(synthetic_data)
-
-# Display the DataFrame
-print(type(synthetic_df))
-synthetic_df
-
-# Save the DataFrame to a CSV file
-synthetic_df.to_csv('tool_data.csv', index=False)  # index=False prevents adding an extra index column
-print("Tool data saved to 'tool_data.csv'")
+def generate_tool(count: int) -> List[Tool]:
+    """
+    Generate synthetic tool entries.
+    
+    Args:
+        count (int): Number of tool entries to generate.
+    
+    Returns:
+        List[Tool]: List of generated tool entries.
+    """
+    synthetic_results = synthetic_data_generator.generate(
+        subject="tool",
+        extra="Create unique and unconventional tools with diverse capabilities. Tool Types should be from this list: denial-of-service, exploitation, information-gathering, network-capture, credential-exploitation, remote-access, vulnerability-scanning, unknown. Ensure a mix of different tool types and associated kill chain phases.",
+        runs=count,
+    )
+    return synthetic_results
 

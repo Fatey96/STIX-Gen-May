@@ -3,36 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Select STIX Objects</title>
+    <title>STIX Object Generator</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/select_object.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Select STIX Entities</h1>
-        <div class="stix-objects">
-            <button type="button" class="stix-object" data-object="threat-actor">Threat Actor</button>
-            <button type="button" class="stix-object" data-object="malware">Malware</button>
-            <button type="button" class="stix-object" data-object="identity">Identity</button>
-            <button type="button" class="stix-object" data-object="indicator">Indicator</button>
-            <button type="button" class="stix-object" data-object="attack-pattern">Attack Pattern</button>
-            <button type="button" class="stix-object" data-object="tool">Tool</button>
-            <button type="button" class="stix-object" data-object="campaign">Campaign</button>
-            <button type="button" class="stix-object" data-object="intrusion-set">Intrusion Set</button>
-            <button type="button" class="stix-object" data-object="vulnerability">Vulnerability</button>
-            <button type="button" class="stix-object" data-object= "course-of-action">Course of Action</button>
-            <button tpe="button" class="stix-object" data-object="location">Location</button>
-            <button type="button" class="stix-object" data-object="malware-analysis">Malware Analysis</button>
-            <a href="https://oasis-open.github.io/cti-stix-visualization/" target="_blank" class="stix-visualizer-button">Open STIX Visualizer</a>
+        <h1>STIX Object Generator</h1>
+        <div class="stix-objects-container">
+            <h2>Select STIX Entities</h2>
+            <div class="stix-objects">
+                <button type="button" class="stix-object" data-object="threat-actor">Threat Actor</button>
+                <button type="button" class="stix-object" data-object="malware">Malware</button>
+                <button type="button" class="stix-object" data-object="identity">Identity</button>
+                <button type="button" class="stix-object" data-object="tool">Tool</button>
+                <button type="button" class="stix-object" data-object="campaign">Campaign</button>
+                <button type="button" class="stix-object" data-object="intrusion-set">Intrusion Set</button>
+                <button type="button" class="stix-object" data-object="location">Location</button>
+            </div>
         </div>
-            <button id="copy-json" type="button">Copy JSON</button>
-        </div>
+        
         <div class="selected-entities">
             <h2>Selected Entities</h2>
             <form id="selected-entities-form">
                 <div id="selected-list"></div>
-                <input type="button" id="generate-graph" value="Generate Graph">
+                <div class="action-buttons">
+                    <button type="button" id="generate-graph">Generate Graph</button>
+                    <button type="button" id="copy-json">Copy JSON</button>
+                </div>
             </form>
-            <div id="json-output" style="white-space: pre-wrap;"></div>
+        </div>
+        
+        <div class="output-container">
+            <div class="flip-container">
+                <div class="flipper">
+                    <div class="front">
+                        <h3>STIX Bundle</h3>
+                        <div id="json-output"></div>
+                    </div>
+                    <div class="back">
+                        <h3>Story and Analysis</h3>
+                        <div id="story-output"></div>
+                    </div>
+                </div>
+            </div>
+            <button id="flip-button">Flip to Story/Bundle</button>
+        </div>
+        
+        <div class="visualizer-button-container">
+            <a href="https://oasis-open.github.io/cti-stix-visualization/" target="_blank" class="stix-visualizer-button">Open STIX Visualizer</a>
         </div>
     </div>
 

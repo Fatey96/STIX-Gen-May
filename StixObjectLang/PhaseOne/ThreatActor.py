@@ -1,39 +1,40 @@
 import os
-os.environ["OPENAI_API_KEY"] = "sk-proj-6K2dANij8t7gG7FohQxBT3BlbkFJtkFeltl7Ua7K6JuRF6th"
-
-"""# Imports"""
-
-from langchain.prompts import FewShotPromptTemplate, PromptTemplate
-from langchain.chat_models import ChatOpenAI
-from langchain.pydantic_v1 import BaseModel
-from langchain_experimental.tabular_synthetic_data.base import SyntheticDataGenerator
-from langchain_experimental.tabular_synthetic_data.openai import create_openai_data_generator
-from langchain_experimental.tabular_synthetic_data.prompts import SYNTHETIC_FEW_SHOT_SUFFIX, SYNTHETIC_FEW_SHOT_PREFIX
 from typing import List, Optional
+import dotenv
+from langchain_core.prompts import FewShotPromptTemplate, PromptTemplate
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_experimental.tabular_synthetic_data.openai import (
+    OPENAI_TEMPLATE,
+    create_openai_data_generator,
+)
+from langchain_experimental.tabular_synthetic_data.prompts import (
+    SYNTHETIC_FEW_SHOT_PREFIX,
+    SYNTHETIC_FEW_SHOT_SUFFIX,
+)
+from langchain_community.chat_models import ChatOpenAI
+
+dotenv.load_dotenv()
 
 # Define the ThreatActor schema
 class ThreatActor(BaseModel):
-    type: str
-    spec_version: str
-    id: str
-    created: str
-    modified: str
-    name: str
-    threat_actor_types: Optional[List[str]]
-    description: Optional[str] = None
-    aliases: Optional[List[str]] = None
-    first_seen: Optional[str] = None
-    last_seen: Optional[str] = None
-    roles: Optional[List[str]] = None
-    goals: Optional[List[str]] = None
-    sophistication: Optional[str] = None
-    resource_level: Optional[str] = None
-    primary_motivation: Optional[str] = None
-    secondary_motivations: Optional[List[str]] = None
-    personal_motivations: Optional[List[str]] = None
-
-
-"""# Sample Data as example"""
+    type: str = Field(default="threat-actor")
+    spec_version: str = Field(default="2.1")
+    id: str = Field(description="Unique identifier for the threat actor")
+    created: str = Field(description="Creation date of the threat actor entry")
+    modified: str = Field(description="Last modification date of the threat actor entry")
+    name: str = Field(description="Name of the threat actor")
+    threat_actor_types: List[str] = Field(description="Types of threat actor")
+    description: Optional[str] = Field(default=None, description="Description of the threat actor")
+    aliases: Optional[List[str]] = Field(default=None, description="Alternative names for the threat actor")
+    first_seen: str = Field(description="Date when the threat actor was first observed")
+    last_seen: str = Field(description="Date when the threat actor was last observed")
+    roles: Optional[List[str]] = Field(default=None, description="Roles played by the threat actor")
+    goals: Optional[List[str]] = Field(default=None, description="Objectives of the threat actor")
+    sophistication: Optional[str] = Field(default=None, description="Level of sophistication of the threat actor")
+    resource_level: Optional[str] = Field(default=None, description="Resources available to the threat actor")
+    primary_motivation: Optional[str] = Field(default=None, description="Main motivation of the threat actor")
+    secondary_motivations: Optional[List[str]] = Field(default=None, description="Secondary motivations of the threat actor")
+    personal_motivations: Optional[List[str]] = Field(default=None, description="Personal motivations of the threat actor")
 
 examples = [
     {"example": """Type: threat-actor, Name: Silent Griffin, Threat Actor Types: nation-state, Description: They are a sophisticated nation-state actor believed to be operating under the directive of the government of Country X. Its activities are primarily focused on espionage and gathering intelligence from foreign governments and corporations, Aliases: Griffin Shadow, State Griffin, Roles: spy, Goals: Collect intelligence, Disrupt foreign infrastructure, Sophistication: expert, Resource Level: government, Primary Motivation: ideology"""},
@@ -48,8 +49,6 @@ examples = [
     {"example": """Type: threat-actor, Name: Sarah Smith, Threat Actor Types: insider-threat, Description: They are a disgruntled former employee of Corporation X, seeks to cause harm to the company after being terminated.  She has retained some access to company systems, Roles: insider, Goals: Sabotage company operations, Leak sensitive data, Sophistication: intermediate, Resource Level: individual, Primary Motivation: revenge """},
 ]
 
-"""# Prompt Template for GPT-4"""
-
 OPENAI_TEMPLATE = PromptTemplate(input_variables=["example"], template="{example}")
 
 prompt_template = FewShotPromptTemplate(
@@ -63,16 +62,23 @@ prompt_template = FewShotPromptTemplate(
 # Create a LangChain data generator
 synthetic_data_generator = create_openai_data_generator(
     output_schema=ThreatActor,
-    llm=ChatOpenAI(temperature=1, model='gpt-4-turbo-preview'),
+    llm=ChatOpenAI(temperature=1, model='gpt-4o'),
     prompt=prompt_template,
 )
 
-def generate_threat_actors(count):
+def generate_threat_actor(count: int) -> List[ThreatActor]:
+    """
+    Generate synthetic threat actors.
+    
+    Args:
+        count (int): Number of threat actors to generate.
+    
+    Returns:
+        List[ThreatActor]: List of generated threat actors.
+    """
     synthetic_results = synthetic_data_generator.generate(
         subject="threat_actor",
         extra="Choose a unique and unconventional name for each threat actor. Avoid common or typical names.",
         runs=count,
     )
-
     return synthetic_results
-
